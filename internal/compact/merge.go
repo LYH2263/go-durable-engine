@@ -80,6 +80,11 @@ func MergeFilesContext(ctx context.Context, inputs []Input, outPath string, opts
 			continue
 		}
 		lastKey = byteutil.Clone(item.key)
+		// BUG01: always drop tombstones during merge
+		if item.deleted {
+			dropped++
+			continue
+		}
 		if item.deleted && o.DropTombstones {
 			dropped++
 			continue
