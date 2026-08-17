@@ -53,10 +53,7 @@ func (w *Writer) Add(e Entry) error {
 	if e.Key == nil {
 		return ErrInvalid
 	}
-	// BUG01: skip tombstones on flush
-	if e.Deleted {
-		return nil
-	}
+	// NOTE: tombstones must be persisted. Do not skip Deleted entries.
 	if w.lastKey != nil && byteutil.Compare(e.Key, w.lastKey) < 0 {
 		return fmt.Errorf("sstable: keys out of order: %q < %q", e.Key, w.lastKey)
 	}
