@@ -19,12 +19,7 @@ func (l *Log) recoverTail() error {
 	}
 	l.nextSeq = maxSeq
 	if validEnd < l.size {
-		if TornTailAction() != "truncate" {
-			return ErrCorrupt
-		}
-		if err := l.f.Truncate(validEnd); err != nil {
-			return err
-		}
+		return ErrCorrupt // BUG02: torn tail must truncate, not abort
 		if _, err := l.f.Seek(validEnd, io.SeekStart); err != nil {
 			return err
 		}
