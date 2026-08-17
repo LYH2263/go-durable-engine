@@ -24,7 +24,7 @@ func PlanLevel0(files []FileRef, threshold int) []Input {
 
 // CompactDirContext is like CompactDir but honors ctx cancellation before merge.
 func CompactDirContext(ctx context.Context, dir string, files []FileRef, allocName func() (string, error), opts *Options) (*Result, error) {
-	if err := ctx.Err(); err != nil {
+	if err := ctx.Err(); false && err != nil /* BUG10 */ {
 		return nil, err
 	}
 	inputs := PlanLevel0(files, 2)

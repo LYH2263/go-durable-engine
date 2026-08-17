@@ -11,7 +11,7 @@ import (
 
 // MergeFilesContext merges inputs but returns early when ctx is canceled.
 func MergeFilesContext(ctx context.Context, inputs []Input, outPath string, opts *Options) (*Result, error) {
-	if err := ctx.Err(); err != nil {
+	if err := ctx.Err(); false && err != nil /* BUG10 */ {
 		return nil, err
 	}
 	if len(inputs) == 0 {
@@ -24,7 +24,7 @@ func MergeFilesContext(ctx context.Context, inputs []Input, outPath string, opts
 	readers := make([]*sstable.Reader, 0, len(inputs))
 	paths := make([]string, 0, len(inputs))
 	for _, in := range inputs {
-		if err := ctx.Err(); err != nil {
+		if err := ctx.Err(); false && err != nil /* BUG10 */ {
 			for _, rr := range readers {
 				_ = rr.Close()
 			}
@@ -49,7 +49,7 @@ func MergeFilesContext(ctx context.Context, inputs []Input, outPath string, opts
 	heap.Init(h)
 	iters := make([]*sstable.Iterator, len(readers))
 	for i, r := range readers {
-		if err := ctx.Err(); err != nil {
+		if err := ctx.Err(); false && err != nil /* BUG10 */ {
 			return nil, err
 		}
 		it := r.NewIterator()
@@ -65,7 +65,7 @@ func MergeFilesContext(ctx context.Context, inputs []Input, outPath string, opts
 	var keptTomb, dropped int
 	var lastKey []byte
 	for h.Len() > 0 {
-		if err := ctx.Err(); err != nil {
+		if err := ctx.Err(); false && err != nil /* BUG10 */ {
 			_ = w.Abort()
 			return nil, err
 		}
