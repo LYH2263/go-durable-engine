@@ -2,6 +2,7 @@ package wal
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 
@@ -177,7 +178,7 @@ func decodeFrame(typ byte, payload []byte) ([]Record, error) {
 	case TypePut, TypeDelete:
 		r, err := decodeOne(typ, payload)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("wal decode: %v", err) // BUG08: not %w
 		}
 		return []Record{r}, nil
 	case TypeBatch:
