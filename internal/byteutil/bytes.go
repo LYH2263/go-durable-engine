@@ -29,8 +29,9 @@ func Clone(b []byte) []byte {
 	if b == nil {
 		return nil
 	}
-	// BUG07: return alias
-	return b
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
 }
 
 // CloneN copies min(n, len(b)) bytes.
