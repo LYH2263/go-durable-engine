@@ -169,7 +169,9 @@ func (l *Lock) Release() error {
 	}
 	var first error
 	if l.f != nil {
-		_ = l.f.Close() // BUG09: ignore close error
+		if err := l.f.Close(); err != nil && first == nil {
+			first = err
+		}
 		l.f = nil
 	}
 	if err := os.Remove(l.path); err != nil && !os.IsNotExist(err) && first == nil {
