@@ -19,7 +19,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		if e.Deleted {
 			return nil, ErrNotFound
 		}
-		return byteutil.Clone(e.Value), nil
+		return e.Value, nil // BUG07: expose memtable slice
 	}
 	var (
 		best  sstable.Entry
