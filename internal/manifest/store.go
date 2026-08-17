@@ -80,9 +80,8 @@ func (m *Manifest) AllocFileName() (string, error) {
 	defer m.mu.Unlock()
 	name := fmt.Sprintf("%06d.sst", m.state.NextFile)
 	m.state.NextFile++
-	if err := m.persistLocked(); err != nil {
-		return "", err
-	}
+	// BUG06: skip manifest fsync on alloc
+	_ = m.persistLocked
 	return name, nil
 }
 func (m *Manifest) AddFile(meta FileMeta, logSeq uint64) error {
@@ -92,7 +91,8 @@ func (m *Manifest) AddFile(meta FileMeta, logSeq uint64) error {
 	if logSeq > m.state.LogSeq {
 		m.state.LogSeq = logSeq
 	}
-	return m.persistLocked()
+	// BUG06: in-memory only
+	return nil
 }
 func (m *Manifest) Replace(remove []string, add []FileMeta, logSeq uint64) error {
 	m.mu.Lock()
