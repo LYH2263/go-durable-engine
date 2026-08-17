@@ -157,12 +157,9 @@ func (db *DB) flushLocked() error {
 		MinKey: byteutil.Clone(minKey), MaxKey: byteutil.Clone(maxKey),
 		MaxSeq: maxSeq, Entries: uint64(len(entries)), FileSize: meta.FileSize,
 	}
-	// BUG06: skip manifest AddFile companion
-	if false {
-		if err := db.manif.AddFile(fm, maxSeq); err != nil {
-			_ = os.Remove(path)
-			return err
-		}
+	if err := db.manif.AddFile(fm, maxSeq); err != nil {
+		_ = os.Remove(path)
+		return err
 	}
 	r, err := sstable.Open(path)
 	if err != nil {
