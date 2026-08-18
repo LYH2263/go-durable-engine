@@ -150,22 +150,43 @@ func TestBug03_MergePicksHighestSeq(t *testing.T) {
 	}
 }
 
-func TestBug04_SeqMonotonicAfterReopen(t *testing.T) {
+func TestBug04_OpenContextHonorsCancel(t *testing.T) {
 	dir := t.TempDir()
 	db, err := Open(dir, &Options{SyncPolicy: SyncFull})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	b := NewWriteBatch()
-	b.Put([]byte("z"), []byte("1"))
-	b.Put([]byte("z"), []byte("2"))
-	if err := db.Write(b); err != nil {
+	if err := db.Put([]byte("k"), []byte("v")); err != nil {
 		t.Fatal(err)
 	}
-	v, err := db.Get([]byte("z"))
-	if err != nil || !bytes.Equal(v, []byte("2")) {
-		t.Fatalf("batch must apply newer value: %v %q", err, v)
+	if err := db.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	l, err := wal.Open(dir, &wal.Options{SyncOnWrite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.AppendPut([]byte("wal"), []byte("yes")); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	db2, err := OpenContext(ctx, dir, nil)
+	if db2 != nil {
+		_ = db2.Close()
+		t.Fatal("canceled OpenContext must not return a live DB")
+	}
+	if err == nil {
+		t.Fatal("want ctx.Err()")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("want context.Canceled, got %v", err)
 	}
 }
 
