@@ -14,6 +14,10 @@ var (
 	ErrShortWrite = errors.New("wal: short write")
 )
 
+// InjectWriteErr, when non-nil, is consumed by the next writeFrame call.
+// Tests use it to simulate a WAL I/O failure without depending on chmod.
+var InjectWriteErr error
+
 // Record types.
 const (
 	TypePut    byte = 1

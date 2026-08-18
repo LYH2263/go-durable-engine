@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
 	"os"
@@ -126,10 +127,16 @@ func peekSeq(typ byte, payload []byte) (uint64, bool) {
 	}
 }
 func (l *Log) Replay(fn func(Record) error) error {
+	return l.ReplayContext(context.Background(), fn)
+}
+func (l *Log) ReplayContext(ctx context.Context, fn func(Record) error) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.closed {
 		return ErrClosed
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	size := l.size
 	if _, err := l.f.Seek(0, io.SeekStart); err != nil {
@@ -138,6 +145,9 @@ func (l *Log) Replay(fn func(Record) error) error {
 	var off int64
 	hdr := make([]byte, headerSize)
 	for off+headerSize <= size {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if _, err := l.f.ReadAt(hdr, off); err != nil {
 			break
 		}

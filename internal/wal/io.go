@@ -132,6 +132,10 @@ func encodeKV(seq uint64, key, value []byte) []byte {
 	return b
 }
 func (l *Log) writeFrame(typ byte, payload []byte) error {
+	if err := InjectWriteErr; err != nil {
+		InjectWriteErr = nil
+		return err
+	}
 	if len(payload) > 1<<28 {
 		return fmt.Errorf("wal: payload too large: %d", len(payload))
 	}

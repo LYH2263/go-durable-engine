@@ -10,8 +10,8 @@ import (
 func (db *DB) NewIterator() *Iterator {
 	db.mu.RLock()
 	items := db.collectMerged()
-	it := &Iterator{db: db, items: items, idx: -1, release: func() { db.mu.RUnlock() }}
-	return it
+	db.mu.RUnlock()
+	return &Iterator{db: db, items: items, idx: -1}
 }
 func (db *DB) collectMerged() []iterItem {
 	type cand struct {
