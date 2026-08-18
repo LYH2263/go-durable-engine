@@ -188,10 +188,10 @@ func (l *Log) Close() error {
 	}
 	l.closed = true
 	var first error
-	if err := l.f.Close(); err != nil && first == nil { // BUG09: close before sync
+	if err := l.f.Sync(); err != nil && first == nil { // sync before close, so buffered writes are durable
 		first = err
 	}
-	if err := l.f.Sync(); err != nil && first == nil {
+	if err := l.f.Close(); err != nil && first == nil {
 		first = err
 	}
 	return first
