@@ -10,26 +10,13 @@ import (
 func (db *DB) NewIterator() *Iterator {
 	db.mu.RLock()
 	items := db.collectMerged()
-	pinned := db.liveTableReaders()
 	db.mu.RUnlock()
-	return &Iterator{db: db, items: items, idx: -1, pinned: pinned}
-}
-func (it *Iterator) reloadValue() {
-	if !it.Valid() || len(it.pinned) == 0 {
-		return
-	}
-	k := it.items[it.idx].key
-	for i := len(it.pinned) - 1; i >= 0; i-- {
-		e, ok, err := it.pinned[i].Get(k)
-		if err != nil {
-			panic(err)
-		}
-		if !ok || e.Deleted {
-			continue
-		}
-		it.items[it.idx].value = e.Value
-		return
-	}
+	// items is a fully cloned snapshot (keys + values) taken under the lock.
+	// It holds no reference to the live SST readers, so the iterator stays valid
+	// even if Compact closes or removes those tables while it is still open.
+	// Releasing the lock now lets Compact proceed concurrently instead of
+	// deadlocking against an iterator-held read lock.
+	return &Iterator{db: db, items: items, idx: -1}
 }
 func (db *DB) collectMerged() []iterItem {
 	type cand struct {
@@ -77,7 +64,6 @@ func (it *Iterator) SeekToFirst() {
 		return
 	}
 	it.idx = 0
-	it.reloadValue()
 }
 func (it *Iterator) Seek(target []byte) {
 	it.idx = sort.Search(len(it.items), func(i int) bool {
@@ -97,9 +83,7 @@ func (it *Iterator) Next() {
 	it.idx++
 	if it.idx >= len(it.items) {
 		it.idx = -1
-		return
 	}
-	it.reloadValue()
 }
 func (it *Iterator) Key() []byte {
 	if !it.Valid() {
@@ -108,7 +92,6 @@ func (it *Iterator) Key() []byte {
 	return byteutil.Clone(it.items[it.idx].key)
 }
 func (it *Iterator) Value() []byte {
-	it.reloadValue()
 	if !it.Valid() {
 		return nil
 	}
