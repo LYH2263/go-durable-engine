@@ -49,7 +49,9 @@ func Open(dir string, opts *Options) (*DB, error) {
 	return OpenContext(context.Background(), dir, opts)
 }
 func OpenContext(ctx context.Context, dir string, opts *Options) (*DB, error) {
-	_ = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	o := opts.normalize()
 	if dir == "" {
 		return nil, ErrInvalid
@@ -118,8 +120,7 @@ func (db *DB) replayWAL() error {
 	return db.replayWALContext(context.Background())
 }
 func (db *DB) replayWALContext(ctx context.Context) error {
-	_ = ctx
-	return db.wal.Replay(func(rec wal.Record) error {
+	return db.wal.ReplayContext(ctx, func(rec wal.Record) error {
 		if rec.Deleted {
 			db.mem.Delete(rec.Key, rec.Seq)
 		} else {
