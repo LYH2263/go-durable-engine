@@ -35,6 +35,9 @@ func (db *DB) Compact() error {
 			Path: t.Path(), Name: fm.Name, Level: fm.Level, Size: t.FileSize(),
 		})
 	}
+	for _, t := range db.tables {
+		_ = t.Close()
+	}
 	alloc := func() (string, error) { return db.manif.AllocFileName() }
 	res, err := compact.CompactDir(db.dir, refs, alloc, &compact.Options{DropTombstones: false})
 	if err != nil {

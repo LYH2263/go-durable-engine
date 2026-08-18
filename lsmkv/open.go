@@ -116,6 +116,9 @@ func (db *DB) openTables() error {
 	db.tables = tables
 	return nil
 }
+func (db *DB) liveTableReaders() []*sstable.Reader {
+	return db.tables
+}
 func (db *DB) replayWAL() error {
 	return db.replayWALContext(context.Background())
 }

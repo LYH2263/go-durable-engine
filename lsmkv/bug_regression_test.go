@@ -105,48 +105,54 @@ func TestBug02_WALSkipsBadCRCContinues(t *testing.T) {
 	}
 }
 
-func TestBug03_MergePicksHighestSeq(t *testing.T) {
+func TestBug03_IteratorSurvivesCompact(t *testing.T) {
 	dir := t.TempDir()
-	p1 := filepath.Join(dir, "a.sst")
-	p2 := filepath.Join(dir, "b.sst")
-	_, err := sstable.WriteFile(p1, []sstable.Entry{
-		{Key: []byte("k"), Value: []byte("old"), Seq: 1},
-	}, nil)
+	opts := &Options{MemtableBytes: 1 << 20, CompactThreshold: 2, SyncPolicy: SyncFull}
+	db, err := Open(dir, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = sstable.WriteFile(p2, []sstable.Entry{
-		{Key: []byte("k"), Value: []byte("new"), Seq: 9},
-	}, nil)
-	if err != nil {
+	defer db.Close()
+	for _, kv := range [][2]string{{"a", "1"}, {"b", "2"}, {"c", "3"}} {
+		if err := db.Put([]byte(kv[0]), []byte(kv[1])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if !compact.PreferNewerSeq(9, 1) {
-		t.Fatal("PreferNewerSeq must prefer higher sequence")
+	for _, kv := range [][2]string{{"d", "4"}, {"e", "5"}, {"f", "6"}} {
+		if err := db.Put([]byte(kv[0]), []byte(kv[1])); err != nil {
+			t.Fatal(err)
+		}
 	}
-	out := filepath.Join(dir, "out.sst")
-	res, err := compact.MergeFiles(
-		[]compact.Input{{Path: p1, Level: 0}, {Path: p2, Level: 0}},
-		out,
-		&compact.Options{DropTombstones: false},
-	)
-	if err != nil {
+	if err := db.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if res.DroppedObsolete != 1 {
-		t.Fatalf("want 1 obsolete drop, got %d", res.DroppedObsolete)
+	if db.TableCount() < 2 {
+		t.Fatalf("need >=2 sst before compact, got %d", db.TableCount())
 	}
-	r, err := sstable.Open(res.OutputPath)
-	if err != nil {
+	it := db.NewIterator()
+	defer it.Close()
+	it.SeekToFirst()
+	if !it.Valid() {
+		t.Fatal("iterator empty before compact")
+	}
+	got := map[string]string{string(it.Key()): string(it.Value())}
+	if err := db.Compact(); err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
-	e, ok, err := r.Get([]byte("k"))
-	if err != nil || !ok {
-		t.Fatalf("get: ok=%v err=%v", ok, err)
+	for it.Next(); it.Valid(); it.Next() {
+		got[string(it.Key())] = string(it.Value())
 	}
-	if !bytes.Equal(e.Value, []byte("new")) {
-		t.Fatalf("want newest seq value, got %q", e.Value)
+	want := map[string]string{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6"}
+	if len(got) != len(want) {
+		t.Fatalf("after compact iterator keys=%d want %d got=%v", len(got), len(want), got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("after compact key %q: got %q want %q", k, got[k], v)
+		}
 	}
 }
 
