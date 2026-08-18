@@ -69,8 +69,6 @@ type Iterator struct {
 	items   []iterItem
 	idx     int
 	release func()
-	// pinned holds live SST readers; Compact may close them while the iterator is open.
-	pinned []*sstable.Reader
 }
 type iterItem struct {
 	key     []byte
