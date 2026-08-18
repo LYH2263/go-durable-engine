@@ -23,10 +23,10 @@ func (db *DB) Put(key, value []byte) error {
 		return ErrReadOnly
 	}
 	seq, err := db.wal.AppendPut(key, value)
-	if err != nil {
-		return err
-	}
 	db.mem.Put(key, value, seq)
+	if err != nil {
+		return nil
+	}
 	if db.mem.ShouldFlush() {
 		return db.flushLocked()
 	}

@@ -169,26 +169,43 @@ func TestBug04_SeqMonotonicAfterReopen(t *testing.T) {
 	}
 }
 
-func TestBug05_BloomNoFalseNegative(t *testing.T) {
+func TestBug05_PutSurfacesWALWriteError(t *testing.T) {
 	dir := t.TempDir()
-	p := filepath.Join(dir, "t.sst")
-	_, err := sstable.WriteFile(p, []sstable.Entry{
-		{Key: []byte("present"), Value: []byte("v"), Seq: 1},
-	}, nil)
+	db, err := Open(dir, &Options{SyncPolicy: SyncFull})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := sstable.Open(p)
+	wal.InjectWriteErr = wal.ErrShortWrite
+	defer func() { wal.InjectWriteErr = nil }()
+	if err := db.Put([]byte("lost"), []byte("x")); err == nil {
+		_, memErr := db.Get([]byte("lost"))
+		_ = db.wal.Close()
+		_ = db.lock.Release()
+		db.closed = true
+		db2, oerr := Open(dir, nil)
+		var reopenErr error
+		if oerr != nil {
+			reopenErr = oerr
+		} else {
+			_, reopenErr = db2.Get([]byte("lost"))
+			_ = db2.Close()
+		}
+		t.Fatalf("Put must return WAL write error; memtable get=%v reopen get=%v", memErr, reopenErr)
+	}
+	wal.InjectWriteErr = nil
+	if _, err := db.Get([]byte("lost")); err != ErrNotFound {
+		t.Fatalf("memtable must not keep key after failed Put: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db2, err := Open(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
-	if !r.MayContain([]byte("present")) {
-		t.Fatal("bloom false negative on inserted key")
-	}
-	e, ok, err := r.Get([]byte("present"))
-	if err != nil || !ok || !bytes.Equal(e.Value, []byte("v")) {
-		t.Fatalf("get present: ok=%v err=%v val=%q", ok, err, e.Value)
+	defer db2.Close()
+	if _, err := db2.Get([]byte("lost")); err != ErrNotFound {
+		t.Fatalf("reopen must not find key that failed WAL: %v", err)
 	}
 }
 
