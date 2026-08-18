@@ -19,7 +19,16 @@ func (l *Log) recoverTail() error {
 	}
 	l.nextSeq = maxSeq
 	if validEnd < l.size {
-		return ErrCorrupt // BUG02: torn tail must truncate, not abort
+		// Bug02: a torn/short tail (partial header, truncated payload, or a
+		// CRC mismatch from trailing garbage) must be truncated to the last
+		// valid frame so Open continues. Aborting here would discard every
+		// record appended after the corruption on the next reopen.
+		if TornTailAction() != "truncate" {
+			return ErrCorrupt
+		}
+		if err := l.f.Truncate(validEnd); err != nil {
+			return err
+		}
 		if _, err := l.f.Seek(validEnd, io.SeekStart); err != nil {
 			return err
 		}
